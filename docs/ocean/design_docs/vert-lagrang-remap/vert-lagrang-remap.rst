@@ -47,10 +47,7 @@ Requirement: Performance is not degraded below an acceptable level.
 
 Requirement: Layer thicknesses are non-negative.
 
-*Possible additional requirements:
-- re. development of instabilities
-- re. conservation/monotonicity of interpolants
-*
+Requirement: Remapping operation is conservative in the layer-wise sense.
 
 
 *Each requirement is to be listed under a "section" heading, as there will be a
