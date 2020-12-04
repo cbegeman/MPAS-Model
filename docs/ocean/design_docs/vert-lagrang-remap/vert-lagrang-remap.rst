@@ -45,7 +45,7 @@ Requirement: For the same target grid, the solution for layer thicknesses and ke
 
 Requirement: Performance is not degraded below an acceptable level.
 
-Requirement: Layer thicknesses are non-negative (and above a minimum thickness).
+Requirement: Layer thicknesses are non-negative.
 
 *Possible additional requirements:
 - re. development of instabilities
