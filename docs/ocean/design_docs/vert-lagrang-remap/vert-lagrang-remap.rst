@@ -70,6 +70,8 @@ Date last modified: 2020/11/24
 Contributors: Darren Engwirda, Xylar Asay-Davis, Carolyn Begeman
 
 The vertical Lagrangian-remap can be characterized by the following equations, as written in Griffies and Adcroft (2020):
+
+*Math likely needs to be edited from latex version*
 .. math::
 \begin{eqnarray}
 \mbox{\textcolor{blue}{lagrangian layer motion}}&&\label{w_grid}
