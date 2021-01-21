@@ -1449,10 +1449,13 @@ module ocn_time_integration_rk4
       real (kind=RKIND), dimension(:), pointer :: bottomDepth
       real (kind=RKIND), dimension(:, :), pointer :: layerThickness, restingThickness
       real (kind=RKIND), dimension(:, :), pointer :: normalVelocity
+      real (kind=RKIND), dimension(:, :), pointer :: highFreqThickness,lowFreqDivergence
       real (kind=RKIND), dimension(:, :, :), pointer :: tracersGroup
 
       integer,pointer :: config_vert_remap_order
       
+      err = 0
+
       call mpas_pool_get_config(block % configs, 'config_vert_remap_order', config_vert_remap_order)
       call mpas_pool_get_dimension(block % dimensions, 'nCells', nCells)
       call mpas_pool_get_dimension(block % dimensions, 'nEdges', nEdges)
@@ -1474,6 +1477,25 @@ module ocn_time_integration_rk4
       
       call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, 2)
       call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocity, 2)
+      if (config_use_freq_filtered_thickness) then
+         call mpas_pool_get_array(statePool, 'highFreqThickness', highFreqThickness, 2)
+         call mpas_pool_get_array(statePool, 'lowFreqDivergence', lowFreqDivergence, 2)
+      end if
+      
+      ! Options for remapping
+      ! TODO move to initialization routine
+      if ( config_vert_remap_order == 1 ) then
+         opts%cell_meth = pcm_method ! PCM method
+      elseif ( config_vert_remap_order == 2 ) then
+         opts%cell_meth = plm_method ! PLM method
+      elseif ( config_vert_remap_order == 3 ) then
+         opts%cell_meth = ppm_method ! PPM method
+         opts%edge_meth = p3e_method ! 3rd-order edge interp.
+      elseif ( config_vert_remap_order == 5 ) then
+         opts%cell_meth = pqm_method ! PPM method
+         opts%edge_meth = p5e_method ! 3rd-order edge interp.
+      endif
+      opts%cell_lims = mono_limit ! monotone slope limits TODO: consider config_monotonic
 
    !----------------------------------------------------------------------------
    !- SETUP VERTICAL GRIDS:
