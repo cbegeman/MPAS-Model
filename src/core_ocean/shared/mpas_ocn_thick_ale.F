@@ -53,6 +53,7 @@ module ocn_thick_ale
    !--------------------------------------------------------------------
 
    integer :: configALEthicknessProportionality
+   integer :: configALETargetGrid
 
 !***********************************************************************
 
@@ -146,6 +147,9 @@ contains
       !
       ! ALE thickness alteration due to SSH (z-star)
       !
+      ! Note that config_ALE_target_grid = 'z_initial' is hard-coded by the use of
+      ! restingThickness in these equations
+
       if (configALEthicknessProportionality==1) then ! restingThickness_times_weights
 
          !$omp parallel
@@ -169,7 +173,7 @@ contains
          !$omp end do
          !$omp end parallel
    
-         elseif (configALEthicknessProportionality==2) then ! weights_only
+      elseif (configALEthicknessProportionality==2) then ! weights_only
          !$omp parallel
          !$omp do schedule(runtime) private(kMax, weightSum, k)
          do iCell = 1, nCells
@@ -281,6 +285,14 @@ contains
              MPAS_LOG_CRIT)
       endif
 
+      if (config_ALE_target_grid=='z_initial') then
+          configALETargetGrid = 1 ! currently unused
+      else
+          call mpas_log_write( &
+             ' Warning: config_ALE_target_grid is not valid', &
+             MPAS_LOG_CRIT)
+      endif
+      
       err = 0
 
     end subroutine ocn_thick_ale_init!}}}
