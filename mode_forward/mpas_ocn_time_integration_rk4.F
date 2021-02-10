@@ -1522,7 +1522,7 @@ module ocn_time_integration_rk4
       !- been properly initiallised at this point...
       !- layerThicknessEdge could involve upwinding, so need to be careful!
 
-         do k = maxLevelEdgeTop(iEdge) + 1, 1, -1
+         do k = maxLevelEdgeTop(iEdge), 1, -1
             heightEdgeNow(k, iEdge) = &
                0.5_RKIND * (heightCellNow(k, iCell) + heightCellNow(k, jCell))
             heightEdgeNew(k, iEdge) = &
