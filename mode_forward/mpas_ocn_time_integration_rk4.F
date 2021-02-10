@@ -51,6 +51,7 @@ module ocn_time_integration_rk4
    !
    ! Public parameters
    !
+   integer :: configVertAdvMethod
    !--------------------------------------------------------------------
 
    !--------------------------------------------------------------------
@@ -205,6 +206,15 @@ module ocn_time_integration_rk4
       call mpas_pool_get_config(domain % configs, 'config_zero_drying_velocity', config_zero_drying_velocity)
       call mpas_pool_get_config(domain % configs, 'config_use_tidal_forcing', config_use_tidal_forcing)
       call mpas_pool_get_config(domain % configs, 'config_tidal_forcing_type', config_tidal_forcing_type)
+      call mpas_pool_get_config(domain % configs, 'config_vert_advection_method', config_vert_advection_method)
+
+      
+      if ( config_vert_advection_method == 'flux-form' ) then
+         configVertAdvMethod = 1
+      elseif ( config_vert_advection_method == 'remap' ) then
+         configVertAdvMethod = 2
+      endif
+ 
 
       !
       ! Initialize time_levs(2) with state at current time
@@ -616,7 +626,7 @@ module ocn_time_integration_rk4
       !! Hack in remapping here?
       !! just do this for "impermeable-interfaces" for now...
 
-      if (config_vert_coord_movement.eq.'impermeable_interfaces') then
+      if ( configVertAdvMethod == 2 ) then
          block => domain % blocklist
          do while(associated(block))
             call ocn_remap_vert_state(block, err)
