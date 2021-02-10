@@ -196,10 +196,10 @@ module ocn_tracer_advection
 
       ! set all other options from submodule initialization routines
       call ocn_tracer_advection_std_init(config_horiz_tracer_adv_order, &
-                     config_vert_tracer_adv_order, config_coef_3rd_order, &
+                     config_vert_tracer_adv_flux_order, config_coef_3rd_order, &
                      config_check_tracer_monotonicity, errTmp)
       call ocn_tracer_advection_mono_init(config_num_halos, config_horiz_tracer_adv_order,    &
-                                          config_vert_tracer_adv_order, config_coef_3rd_order, &
+                                          config_vert_tracer_adv_flux_order, config_coef_3rd_order, &
                                           config_check_tracer_monotonicity, err)
 
       ! if an error is returned from init routines, write an error

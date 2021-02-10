@@ -917,7 +917,11 @@
 					description="Method for advecting tracers, momentum, and thickness vertically."
 					possible_values="'flux-form' and 'remap'"
 		/>
-		<nml_option name="config_vert_tracer_adv_order" type="integer" default_value="3" units="unitless"
+		<nml_option name="config_vert_remap_order" type="integer" default_value="3" units="unitless"
+					description="Order of remapping method used for momentum and tracer advection"
+					possible_values="1, 2, 3 and 5"
+		/>
+		<nml_option name="config_vert_tracer_adv_flux_order" type="integer" default_value="3" units="unitless"
 					description="Order of polynomial used for tracer reconstruction at layer edges for flux-form method"
 					possible_values="2, 3 and 4"
 		/>

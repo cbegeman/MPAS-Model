@@ -1449,6 +1449,9 @@ module ocn_time_integration_rk4
       real (kind=RKIND), dimension(:, :), pointer :: normalVelocity
       real (kind=RKIND), dimension(:, :, :), pointer :: tracersGroup
 
+      integer,pointer :: config_vert_remap_order
+      
+      call mpas_pool_get_config(block % configs, 'config_vert_remap_order', config_vert_remap_order)
       call mpas_pool_get_dimension(block % dimensions, 'nCells', nCells)
       call mpas_pool_get_dimension(block % dimensions, 'nEdges', nEdges)
 
@@ -1557,8 +1560,17 @@ module ocn_time_integration_rk4
       dataNow = 0.0_RKIND
       dataNew = 0.0_RKIND
 
-      opts%edge_meth = p3e_method ! 3rd-order edge interp.
-      opts%cell_meth = ppm_method ! PPM method
+      if ( config_vert_remap_order == 1 ) then
+         opts%cell_meth = pcm_method ! PCM method
+      elseif ( config_vert_remap_order == 2 ) then
+         opts%cell_meth = plm_method ! PLM method
+      elseif ( config_vert_remap_order == 3 ) then
+         opts%cell_meth = ppm_method ! PPM method
+         opts%edge_meth = p3e_method ! 3rd-order edge interp.
+      elseif ( config_vert_remap_order == 5 ) then
+         opts%cell_meth = pqm_method ! PPM method
+         opts%edge_meth = p5e_method ! 3rd-order edge interp.
+      endif
       opts%cell_lims = mono_limit ! monotone slope limits
 
       bcUpper%bcopt = bcon_loose ! "loose" => extrapolate
