@@ -189,6 +189,10 @@ module ocn_time_integration_rk4
       real (kind=RKIND), dimension(:,:), pointer :: restingThickness
       real (kind=RKIND) :: totalDepth
 
+      ! Remap variables
+      real (kind=RKIND) :: totalThickness
+      real (kind=RKIND), dimension(:,:), allocatable :: layerThicknessRemap
+      
       ! Get config options
       call mpas_pool_get_config(domain % configs, 'config_mom_del4', config_mom_del4)
       call mpas_pool_get_config(domain % configs, 'config_filter_btr_mode', config_filter_btr_mode)
@@ -625,8 +629,34 @@ module ocn_time_integration_rk4
       if ( configVertAdvMethod == 2 ) then
          block => domain % blocklist
          do while(associated(block))
-            call ocn_remap_vert_state(block, err)
+            call mpas_pool_get_subpool(block % structs, 'state', statePool)
+            call mpas_pool_get_array(statePool, 'layerThickness', layerThicknessNew, 2)
+            call mpas_pool_get_dimension(block % dimensions, 'nCells', nCells)
+            call mpas_pool_get_subpool(block % structs, 'verticalMesh', verticalMeshPool)
+            call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
+            call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
+            call mpas_pool_get_array(meshPool, 'bottomDepth', bottomDepth)
+            call mpas_pool_get_array(verticalMeshPool, 'restingThickness', restingThickness)
+            call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocityCur, 1)
+            call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocityNew, 2)
+            
+            allocate(layerThicknessRemap(nVertLevels, nCells))
+         !- calc. z*-style expansions
+            do iCell = 1, nCells
+               totalThickness = 0.0_RKIND
+               do k = maxLevelCell(iCell), 1, -1
+                  totalThickness = totalThickness + layerThicknessNew(k,iCell)
+               end do
 
+               do k = maxLevelCell(iCell), 1, -1
+                  layerThicknessRemap(k, iCell) = restingThickness(k, iCell) * &
+                                                  totalThickness / bottomDepth(iCell)
+               end do
+            end do
+
+            call ocn_remap_vert_state(block, layerThicknessRemap, err)
+
+            deallocate(layerThicknessRemap)
             block => block % next
          end do
       end if
@@ -1421,15 +1451,15 @@ module ocn_time_integration_rk4
 
 
 
-   subroutine ocn_remap_vert_state(block, err)
+   subroutine ocn_remap_vert_state(block, layerThicknessNew, err)
 
       type (block_type), intent(in) :: block
+      real (kind=RKIND), dimension(:, :), intent(in) :: layerThicknessNew
       integer, intent(out) :: err
 
       integer, pointer :: nCells, nEdges, nVertLevels
       integer :: nLevels, nVars, nDoFs, nTracers
       integer :: iCell, jCell, iEdge, iTrac, k
-      real (kind=RKIND) :: scale
 
       type (mpas_pool_type), pointer :: meshPool, verticalMeshPool
       type (mpas_pool_type), pointer :: statePool
@@ -1443,8 +1473,6 @@ module ocn_time_integration_rk4
       real (kind=RKIND), dimension(:, :, :), allocatable :: dataNow, dataNew
       real (kind=RKIND), dimension(:, :), allocatable :: heightCellNow, heightEdgeNow
       real (kind=RKIND), dimension(:, :), allocatable :: heightCellNew, heightEdgeNew
-      real (kind=RKIND), dimension(:, :), allocatable :: layerThicknessRemap
-      real (kind=RKIND), dimension(:, :), allocatable :: layerThicknessEdgeNow, layerThicknessEdgeNew
       
       integer, dimension(:), pointer :: maxLevelCell, maxLevelEdgeTop, maxLevelEdgeBot
       integer, dimension(:, :), pointer :: cellsOnEdge
@@ -1512,14 +1540,10 @@ module ocn_time_integration_rk4
       allocate(heightCellNew(nVertLevels + 1, nCells))
       allocate(heightEdgeNow(nVertLevels + 1, nEdges))
       allocate(heightEdgeNew(nVertLevels + 1, nEdges))
-      allocate(layerThicknessEdgeNow(nVertLevels + 1, nEdges))
-      allocate(layerThicknessEdgeNew(nVertLevels + 1, nEdges))
-      allocate(layerThicknessRemap(nVertLevels + 1, nCells))
       
       do iCell = 1, nCells
          heightCellNow(:, iCell) = -bottomDepth(iCell)
          heightCellNew(:, iCell) = -bottomDepth(iCell)
-         layerThicknessRemap(:, iCell) = 0.0_RKIND
 
       !- reconstruct "now" heights
 
@@ -1528,20 +1552,12 @@ module ocn_time_integration_rk4
                heightCellNow(k + 1, iCell) + layerThickness(k, iCell)
          end do
 
-      !- calc. z*-style expansions
-
-         scale = &
-            (heightCellNow(1, iCell) + bottomDepth(iCell)) / bottomDepth(iCell)
-         do k = maxLevelCell(iCell), 2, -1
-            layerThicknessRemap(k, iCell) = restingThickness(k, iCell) * scale
-         end do
-
       !- reconstruct "new" heights
 
          heightCellNew(1, iCell) = heightCellNow(1, iCell)
          do k = maxLevelCell(iCell), 2, -1
             heightCellNew(k, iCell) = &
-               heightCellNew(k + 1, iCell) + layerThicknessRemap(k, iCell)
+               heightCellNew(k + 1, iCell) + layerThicknessNew(k, iCell)
          end do
       end do
 
@@ -1569,12 +1585,11 @@ module ocn_time_integration_rk4
 
          do k = maxLevelEdgeTop(iEdge), 1, -1
             heightEdgeNow(k, iEdge) = &
-               0.5_RKIND * (heightCellNow(k, iCell) + heightCellNow(k, jCell))
+                           0.5_RKIND * (heightCellNow(k, iCell) + heightCellNow(k, jCell))
             heightEdgeNew(k, iEdge) = &
-               0.5_RKIND * (heightCellNew(k, iCell) + heightCellNew(k, jCell))
+                           0.5_RKIND * (heightCellNew(k, iCell) + heightCellNew(k, jCell))
          end do
       end do
-
 
    !----------------------------------------------------------------------------
    !- ACTUAL REMAPPING FROM HERE
