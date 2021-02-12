@@ -1596,7 +1596,11 @@ module ocn_time_integration_rk4
 
    !- just simple hard-coded options for PPR at this stage...
 
-      nVars = 1 ! how many tracers to be remapped concurrently per column
+      if (associated(highFreqThickness) .and. associated(lowFreqDivergence)) then
+         nVars = 3 ! how many tracers to be remapped concurrently per column
+      else
+         nVars = 1 ! how many tracers to be remapped concurrently per column
+      endif
       nDoFs = 1 ! always 1 for MPAS, it'd be >1 for DG methods (with more DoF per layer)
 
       allocate(dataNow(nDoFs, nVars, nVertLevels))
@@ -1607,19 +1611,6 @@ module ocn_time_integration_rk4
       dataNow = 0.0_RKIND
       dataNew = 0.0_RKIND
 
-      if ( config_vert_remap_order == 1 ) then
-         opts%cell_meth = pcm_method ! PCM method
-      elseif ( config_vert_remap_order == 2 ) then
-         opts%cell_meth = plm_method ! PLM method
-      elseif ( config_vert_remap_order == 3 ) then
-         opts%cell_meth = ppm_method ! PPM method
-         opts%edge_meth = p3e_method ! 3rd-order edge interp.
-      elseif ( config_vert_remap_order == 5 ) then
-         opts%cell_meth = pqm_method ! PPM method
-         opts%edge_meth = p5e_method ! 3rd-order edge interp.
-      endif
-      opts%cell_lims = mono_limit ! monotone slope limits
-
       bcUpper%bcopt = bcon_loose ! "loose" => extrapolate
       bcLower%bcopt = bcon_loose
 
@@ -1627,20 +1618,40 @@ module ocn_time_integration_rk4
 
    !- Remap all edge-centred variables from heightEdgeNow to heightEdgeNew
 
-      do iEdge = 1, nEdges
-         nLevels = maxLevelEdgeTop(iEdge) + 1
+      if (associated(highFreqThickness) .and. associated(lowFreqDivergence)) then
+         do iEdge = 1, nEdges
+            nLevels = maxLevelEdgeTop(iEdge) + 1
 
-         if (nLevels .lt. 2) cycle
+            if (nLevels .lt. 2) cycle
 
-         dataNow(1, 1, :) = normalVelocity(:, iEdge)
+            dataNow(1, 1, :) = normalVelocity(:, iEdge)
+            dataNow(1, 2, :) = highFreqThickness(:, iEdge)
+            dataNow(1, 3, :) = lowFreqDivergence(:, iEdge)
 
-         call rmap1d(nLevels, nLevels, nVars ,nDoFs, &
-            heightEdgeNow(:, iEdge), &
-            heightEdgeNew(:, iEdge), &
-            dataNow, dataNew, bcUpper, bcLower, work, opts)
+            call rmap1d(nLevels, nLevels, nVars ,nDoFs, &
+               heightEdgeNow(:, iEdge), &
+               heightEdgeNew(:, iEdge), &
+               dataNow, dataNew, bcUpper, bcLower, work, opts)
 
-         normalVelocity(:, iEdge) = dataNew(1, 1, :)
-      end do
+            normalVelocity(:, iEdge)    = dataNew(1, 1, :)
+            highFreqThickness(:, iEdge) = dataNew(1, 2, :)
+            lowFreqDivergence(:, iEdge) = dataNew(1, 3, :)
+         end do
+      else
+         do iEdge = 1, nEdges
+            nLevels = maxLevelEdgeTop(iEdge) + 1
+
+            if (nLevels .lt. 2) cycle
+
+            dataNow(1, 1, :) = normalVelocity(:, iEdge)
+
+            call rmap1d(nLevels, nLevels, nVars ,nDoFs, &
+               heightEdgeNow(:, iEdge), &
+               heightEdgeNew(:, iEdge), &
+               dataNow, dataNew, bcUpper, bcLower, work, opts)
+
+            normalVelocity(:, iEdge) = dataNew(1, 1, :)
+         end do
       deallocate(dataNow,dataNew)
       deallocate(bcUpper,bcLower)
       call work%free()
