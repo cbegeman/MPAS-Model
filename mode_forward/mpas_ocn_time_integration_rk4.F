@@ -644,6 +644,9 @@ module ocn_time_integration_rk4
             call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocityNew, 2)
             
             allocate(layerThicknessRemap(nVertLevels, nCells))
+            write(*,*) 'set layerThicknessRemap to layerThicknessNew'
+            layerThicknessRemap = layerThicknessNew
+
          !- calc. z*-style expansions
             do iCell = 1, nCells
                totalThickness = 0.0_RKIND
@@ -1598,6 +1601,10 @@ module ocn_time_integration_rk4
                            0.5_RKIND * (heightCellNew(k, iCell) + heightCellNew(k, jCell))
          end do
       end do
+   !- Assign new layerThicknesses
+      write(*,*) 'set layerThicknessNew to layerThicknessRemap'
+      layerThickness = layerThicknessNew
+
 
    !----------------------------------------------------------------------------
    !- ACTUAL REMAPPING FROM HERE
@@ -1625,6 +1632,7 @@ module ocn_time_integration_rk4
       call work%init(nVertLevels + 1, nVars, opts) ! this is internal workspace for PPR
 
    !- Remap all edge-centred variables from heightEdgeNow to heightEdgeNew
+      write(*,*) 'remap normalVelocity'
 
       if (associated(highFreqThickness) .and. associated(lowFreqDivergence)) then
          do iEdge = 1, nEdges
@@ -1641,9 +1649,9 @@ module ocn_time_integration_rk4
                heightEdgeNew(:, iEdge), &
                dataNow, dataNew, bcUpper, bcLower, work, opts)
 
-            normalVelocity(:, iEdge)    = dataNew(1, 1, :)
-            highFreqThickness(:, iEdge) = dataNew(1, 2, :)
-            lowFreqDivergence(:, iEdge) = dataNew(1, 3, :)
+            normalVelocity   (1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 1, 1:maxLevelEdgeTop(iEdge))
+            highFreqThickness(1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 2, 1:maxLevelEdgeTop(iEdge))
+            lowFreqDivergence(1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 3, 1:maxLevelEdgeTop(iEdge))
          end do
       else
          do iEdge = 1, nEdges
@@ -1658,13 +1666,15 @@ module ocn_time_integration_rk4
                heightEdgeNew(:, iEdge), &
                dataNow, dataNew, bcUpper, bcLower, work, opts)
 
-            normalVelocity(:, iEdge) = dataNew(1, 1, :)
+            normalVelocity(1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 1, 1:maxLevelEdgeTop(iEdge))
          end do
+      end if
       deallocate(dataNow,dataNew)
       deallocate(bcUpper,bcLower)
       call work%free()
    
    !- Remap all cell-centred variables from heightCellNow to heightCellNew
+      write(*,*) 'remap Tracers'
 
       call mpas_pool_begin_iteration(tracersPool)
       do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
@@ -1702,7 +1712,7 @@ module ocn_time_integration_rk4
                      dataNow, dataNew, bcUpper, bcLower, work, opts)
 
                   do iTrac = 1, nTracers
-                     tracersGroup(iTrac, :, iCell) = dataNew(1, iTrac, :)
+                     tracersGroup(iTrac, 1:maxLevelCell(iCell), iCell) = dataNew(1, iTrac, 1:maxLevelCell(iCell))
                   end do
                end do
                deallocate(dataNow,dataNew)
@@ -1711,15 +1721,6 @@ module ocn_time_integration_rk4
                
             end if
          end if
-      end do
-
-   !- Assign new layerThicknesses
-
-      do iCell = 1, nCells
-         do k = maxLevelCell(iCell), 1, -1
-            layerThickness(k, iCell) = &
-                heightCellNew(k + 1, iCell) - heightCellNew(k, iCell)
-         end do
       end do
 
    !- dealloc any local data, etc      
