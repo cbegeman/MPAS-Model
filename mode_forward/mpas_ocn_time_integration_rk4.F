@@ -633,6 +633,8 @@ module ocn_time_integration_rk4
          block => domain % blocklist
          do while(associated(block))
             call mpas_pool_get_subpool(block % structs, 'state', statePool)
+            call mpas_pool_get_subpool(block % structs, 'tend', tendPool)
+            call mpas_pool_get_array(tendPool, 'layerThickness', layerThicknessTend)
             call mpas_pool_get_array(statePool, 'layerThickness', layerThicknessNew, 2)
             call mpas_pool_get_dimension(block % dimensions, 'nCells', nCells)
             call mpas_pool_get_subpool(block % structs, 'verticalMesh', verticalMeshPool)
@@ -644,21 +646,37 @@ module ocn_time_integration_rk4
             call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocityNew, 2)
             
             allocate(layerThicknessRemap(nVertLevels, nCells))
-            write(*,*) 'set layerThicknessRemap to layerThicknessNew'
             layerThicknessRemap = layerThicknessNew
 
          !- calc. z*-style expansions
+            !$omp parallel
+            !$omp do schedule(runtime) private(k,totalThickness)
             do iCell = 1, nCells
                totalThickness = 0.0_RKIND
                do k = maxLevelCell(iCell), 1, -1
                   totalThickness = totalThickness + layerThicknessNew(k,iCell)
                end do
-
                do k = maxLevelCell(iCell), 1, -1
                   layerThicknessRemap(k, iCell) = restingThickness(k, iCell) * &
                                                   totalThickness / bottomDepth(iCell)
                end do
+
+               !if (any(isnan(layerThicknessRemap(:,iCell)))) then
+               if (iCell == 37) then
+                  write(*,*) iCell,'tend_layerThickness',layerThicknessTend(:,iCell)
+                  write(*,*) iCell,'totalThickness',totalThickness
+                  write(*,*) iCell,'layerThicknessCur',layerThicknessCur(:,iCell)
+                  write(*,*) iCell,'layerThicknessNew',layerThicknessNew(:,iCell)
+                  write(*,*) iCell,'layerThicknessRemap',layerThicknessRemap(:,iCell)
+                  write(*,*) iCell,'normalVelocityCur',normalVelocityNew(:,iCell)
+                  write(*,*) iCell,'normalVelocityNew',normalVelocityNew(:,iCell)
+                  write(*,*) iCell,'restingThickness',restingThickness(k,iCell)
+                  write(*,*) iCell,'bottomDepth',bottomDepth(iCell)
+                  write(*,*) iCell,'maxLevelCell',maxLevelCell(iCell)
+               endif
             end do
+            !$omp end do
+            !$omp end parallel
 
             call ocn_remap_vert_state(block, layerThicknessRemap, err)
 
@@ -1564,6 +1582,7 @@ module ocn_time_integration_rk4
          end do
 
       !- reconstruct "new" heights
+      !- Assign new layerThicknesses
 
          heightCellNew(1, iCell) = heightCellNow(1, iCell)
          do k = maxLevelCell(iCell), 2, -1
@@ -1571,6 +1590,7 @@ module ocn_time_integration_rk4
                heightCellNew(k + 1, iCell) + layerThicknessNew(k, iCell)
          end do
       end do
+      layerThickness = layerThicknessNew
 
    !- There's currently a silly issue in PPR: it assumes the "coordinates" for
    !- the data being remapped increases with index. Here, we have the opposite 
@@ -1601,10 +1621,6 @@ module ocn_time_integration_rk4
                            0.5_RKIND * (heightCellNew(k, iCell) + heightCellNew(k, jCell))
          end do
       end do
-   !- Assign new layerThicknesses
-      write(*,*) 'set layerThicknessNew to layerThicknessRemap'
-      layerThickness = layerThicknessNew
-
 
    !----------------------------------------------------------------------------
    !- ACTUAL REMAPPING FROM HERE
@@ -1652,6 +1668,7 @@ module ocn_time_integration_rk4
             normalVelocity   (1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 1, 1:maxLevelEdgeTop(iEdge))
             highFreqThickness(1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 2, 1:maxLevelEdgeTop(iEdge))
             lowFreqDivergence(1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 3, 1:maxLevelEdgeTop(iEdge))
+         
          end do
       else
          do iEdge = 1, nEdges
@@ -1667,6 +1684,7 @@ module ocn_time_integration_rk4
                dataNow, dataNew, bcUpper, bcLower, work, opts)
 
             normalVelocity(1:maxLevelEdgeTop(iEdge), iEdge) = dataNew(1, 1, 1:maxLevelEdgeTop(iEdge))
+         
          end do
       end if
       deallocate(dataNow,dataNew)
@@ -1714,6 +1732,7 @@ module ocn_time_integration_rk4
                   do iTrac = 1, nTracers
                      tracersGroup(iTrac, 1:maxLevelCell(iCell), iCell) = dataNew(1, iTrac, 1:maxLevelCell(iCell))
                   end do
+               
                end do
                deallocate(dataNow,dataNew)
                deallocate(bcUpper,bcLower)
