@@ -1641,7 +1641,6 @@ module ocn_time_integration_rk4
          if (nLevels .lt. 2) cycle
 
          dataNow(1, 1, :) = normalVelocity(:, iEdge)
-        !also do normalTransportVelocity, etc...?
 
          call rmap1d(nLevels, nLevels, nVars ,nDoFs, &
             heightEdgeNow(:, iEdge), &
@@ -1650,7 +1649,10 @@ module ocn_time_integration_rk4
 
          normalVelocity(:, iEdge) = dataNew(1, 1, :)
       end do
-
+      deallocate(dataNow,dataNew)
+      deallocate(bcUpper,bcLower)
+      call work%free()
+   
    !- Remap all cell-centred variables from heightCellNow to heightCellNew
 
       call mpas_pool_begin_iteration(tracersPool)
@@ -1663,22 +1665,38 @@ module ocn_time_integration_rk4
             !- just a simple loop over each one at a time for clarity...
 
                nTracers = size(tracersGroup, dim=1)
+               
+               allocate(dataNow(nDoFs, nTracers, nVertLevels))
+               allocate(dataNew(nDoFs, nTracers, nVertLevels))
+               
+               call work%init(nVertLevels + 1, nTracers, opts) ! this is internal workspace for PPR
+
+               allocate(bcUpper(nTracers))
+               allocate(bcLower(nTracers))
+               ! TODO replace hardcoded bcon_loose with config option 
+               bcUpper%bcopt = bcon_loose ! "loose" => extrapolate
+               bcLower%bcopt = bcon_loose
+               
                do iCell = 1, nCells
                   do iTrac = 1, nTracers
                      nLevels = maxLevelCell(iCell) + 1
 
                      if (nLevels .lt. 2) cycle
 
-                     dataNow(1, 1, :) = tracersGroup(iTrac, :, iCell)
+                     dataNow(1, iTrac, :) = tracersGroup(iTrac, :, iCell)
+                  end do
+                  call rmap1d(nLevels, nLevels, nTracers,nDoFs, &
+                     heightCellNow(:, iCell), &
+                     heightCellNew(:, iCell), &
+                     dataNow, dataNew, bcUpper, bcLower, work, opts)
 
-                     call rmap1d(nLevels, nLevels, nVars ,nDoFs, &
-                        heightCellNow(:, iCell), &
-                        heightCellNew(:, iCell), &
-                        dataNow, dataNew, bcUpper, bcLower, work, opts)
-
-                     tracersGroup(iTrac, :, iCell) = dataNew(1, 1, :)
+                  do iTrac = 1, nTracers
+                     tracersGroup(iTrac, :, iCell) = dataNew(1, iTrac, :)
                   end do
                end do
+               deallocate(dataNow,dataNew)
+               deallocate(bcUpper,bcLower)
+               call work%free()
                
             end if
          end if
@@ -1695,17 +1713,10 @@ module ocn_time_integration_rk4
 
    !- dealloc any local data, etc      
 
-      call work%free()
-
       deallocate(heightCellNow)
       deallocate(heightEdgeNow)
       deallocate(heightCellNew)
       deallocate(heightEdgeNew)
-
-      deallocate(dataNow)
-      deallocate(dataNew)
-      deallocate(bcUpper)
-      deallocate(bcLower)
 
    end subroutine ocn_remap_vert_state
 
