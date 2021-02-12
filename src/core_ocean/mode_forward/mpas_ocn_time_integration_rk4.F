@@ -1443,6 +1443,8 @@ module ocn_time_integration_rk4
       real (kind=RKIND), dimension(:, :, :), allocatable :: dataNow, dataNew
       real (kind=RKIND), dimension(:, :), allocatable :: heightCellNow, heightEdgeNow
       real (kind=RKIND), dimension(:, :), allocatable :: heightCellNew, heightEdgeNew
+      real (kind=RKIND), dimension(:, :), allocatable :: layerThicknessRemap
+      real (kind=RKIND), dimension(:, :), allocatable :: layerThicknessEdgeNow, layerThicknessEdgeNew
       
       integer, dimension(:), pointer :: maxLevelCell, maxLevelEdgeTop, maxLevelEdgeBot
       integer, dimension(:, :), pointer :: cellsOnEdge
@@ -1510,11 +1512,15 @@ module ocn_time_integration_rk4
       allocate(heightCellNew(nVertLevels + 1, nCells))
       allocate(heightEdgeNow(nVertLevels + 1, nEdges))
       allocate(heightEdgeNew(nVertLevels + 1, nEdges))
+      allocate(layerThicknessEdgeNow(nVertLevels + 1, nEdges))
+      allocate(layerThicknessEdgeNew(nVertLevels + 1, nEdges))
+      allocate(layerThicknessRemap(nVertLevels + 1, nCells))
       
       do iCell = 1, nCells
          heightCellNow(:, iCell) = -bottomDepth(iCell)
          heightCellNew(:, iCell) = -bottomDepth(iCell)
-         
+         layerThicknessRemap(:, iCell) = 0.0_RKIND
+
       !- reconstruct "now" heights
 
          do k = maxLevelCell(iCell), 1, -1
@@ -1526,13 +1532,16 @@ module ocn_time_integration_rk4
 
          scale = &
             (heightCellNow(1, iCell) + bottomDepth(iCell)) / bottomDepth(iCell)
+         do k = maxLevelCell(iCell), 2, -1
+            layerThicknessRemap(k, iCell) = restingThickness(k, iCell) * scale
+         end do
 
       !- reconstruct "new" heights
 
          heightCellNew(1, iCell) = heightCellNow(1, iCell)
          do k = maxLevelCell(iCell), 2, -1
             heightCellNew(k, iCell) = &
-               heightCellNew(k + 1, iCell) + restingThickness(k, iCell) * scale
+               heightCellNew(k + 1, iCell) + layerThicknessRemap(k, iCell)
          end do
       end do
 
