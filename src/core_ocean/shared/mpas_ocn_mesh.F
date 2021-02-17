@@ -322,7 +322,7 @@ contains
                                   minLevelVertexTop)
          call mpas_pool_get_array(meshPool, 'minLevelVertexBot', &
                                   minLevelVertexBot)
-         call mpas_pool_get_array(meshPool, 'minLevelCell', &
+         call mpas_pool_get_array(meshPool, 'maxLevelCell', &
                                   maxLevelCell)
          call mpas_pool_get_array(meshPool, 'maxLevelEdgeTop', &
                                   maxLevelEdgeTop)
