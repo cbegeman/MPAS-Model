@@ -65,7 +65,7 @@ module ocn_init_routines
    !--------------------------------------------------------------------
 
    public :: &
-      ocn_init_routines_compute_max_level, &
+      ocn_init_routines_compute_min_max_level, &
       ocn_init_routines_compute_mesh_scaling, &
       ocn_init_routines_setup_sign_and_index_fields, &
       ocn_init_routines_vert_coord, &
@@ -84,7 +84,7 @@ contains
 
 !***********************************************************************
 !
-!  routine ocn_init_routines_compute_max_level
+!  routine ocn_init_routines_compute_min_max_level
 !
 !> \brief  initialize max level and boundary mask variables
 !> \author Doug Jacobsen, Mark Petersen, Todd Ringler
@@ -282,7 +282,7 @@ subroutine ocn_init_routines_compute_min_max_level(domain)!{{{
    ! Note: We do not update halos on maxLevel* variables.  I want the
    ! outside edge of a halo to be zero on each processor.
 
-end subroutine ocn_init_routines_compute_max_level!}}}
+end subroutine ocn_init_routines_compute_min_max_level!}}}
 
 !***********************************************************************
 !
